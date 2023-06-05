@@ -1,5 +1,5 @@
 #include "SdFat.h"
-#include "SystemFont5x7.h"
+#include "Arial_Black_16.h"
 #include <SPI.h>
 #include <DMD2.h>
 
@@ -71,7 +71,7 @@ void setup() {
 
   dmd.begin();
   dmd.setBrightness(BRIGHTNESS);
-  dmd.selectFont(SystemFont5x7);
+  dmd.selectFont(Arial_Black_16);
 
   // Initialize the SD.
   if (!sd.begin(SD_CONFIG)) {
@@ -179,9 +179,9 @@ void dispError(uint8_t code) {
   char codeBuf[2];
 
   dmd.clearScreen();
-  dmd.drawString(0, 1, "Error");
+  dmd.drawString(0, 1, "ERR");
   itoa(code, codeBuf, 10);
-  dmd.drawString(0, 9, codeBuf);
+  dmd.drawString(0, 17, codeBuf);
 }
 
 void lcdUpdate() {
