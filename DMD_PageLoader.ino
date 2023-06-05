@@ -1,5 +1,6 @@
 #include "SdFat.h"
 #include "Arial_Black_16.h"
+#include "Droid_Sans_12.h"
 #include <SPI.h>
 #include <DMD2.h>
 
@@ -10,7 +11,6 @@
 // Maximum file name length (with extention)
 #define MAX_FILE_LEN 18
 #define MAX_PAGES 80
-#define PAGE_TIME 200
 
 #define BRIGHTNESS 200
 
@@ -65,6 +65,7 @@ int files = 0;
 unsigned long previousMillis = 0;
 
 uint8_t timebarPos = 1;
+uint16_t pageTime = 1000;
 
 void setup() {
   Serial.begin(9600);
@@ -73,18 +74,25 @@ void setup() {
   dmd.setBrightness(BRIGHTNESS);
   dmd.selectFont(Arial_Black_16);
 
+  dispLoad(0);
+
   // Initialize the SD.
   if (!sd.begin(SD_CONFIG)) {
     dispError(1);
     while (true) {
     }
   }
+
+  dispLoad(20);
+
   // Open root directory
   if (!dir.open("/")) {
     dispError(2);
     while (true) {
     }
   }
+
+  dispLoad(40);
 
   if (!dir.exists("/timebar_pos")) {
     char timebarBuf[2];
@@ -101,6 +109,25 @@ void setup() {
     file.close();
   }
 
+  dispLoad(60);
+
+  if (!dir.exists("/page_time")) {
+    char pagetimeBuf[7];
+    file.open("page_time", FILE_WRITE);
+    itoa(pageTime, pagetimeBuf, 10);
+    file.write(pagetimeBuf);
+    file.close();
+  } else {
+    char pagetimeBuf[7];
+    file.open("page_time", FILE_READ);
+    file.readString().toCharArray(pagetimeBuf, 7);
+    pageTime = atoi(pagetimeBuf);
+    Serial.println(timebarPos);
+    file.close();
+  }
+
+  dispLoad(80);
+
   // Loop through files and add names to fileNames
   while (file.openNext(&dir, O_RDONLY)) {
     if (!file.isDir()) {
@@ -115,6 +142,8 @@ void setup() {
     }
   }
 
+  dispLoad(100);
+
   wipeAni();
 }
 
@@ -124,7 +153,7 @@ void loop() {
       if (file.open(fileNames[i], FILE_READ)) {
         file.readBytes(fileBuffer, 1024);
         loadPic(fileBuffer);
-        delayBar(PAGE_TIME / 32);
+        delayBar(pageTime / 32);
       } else {
         dispError(4);
         while (true) {
@@ -176,12 +205,25 @@ void delayBar(int time) {
 }
 
 void dispError(uint8_t code) {
+  dmd.selectFont(Arial_Black_16);
+
   char codeBuf[2];
 
   dmd.clearScreen();
   dmd.drawString(0, 1, "ERR");
   itoa(code, codeBuf, 10);
   dmd.drawString(0, 17, codeBuf);
+}
+
+void dispLoad(uint8_t pcnt) {
+  dmd.selectFont(Droid_Sans_12);
+
+  char pcntBuf[2];
+
+  dmd.clearScreen();
+  dmd.drawString(0, 1, "LOAD");
+  itoa(pcnt, pcntBuf, 10);
+  dmd.drawString(0, 17, strcat(pcntBuf, "%"));
 }
 
 void lcdUpdate() {
