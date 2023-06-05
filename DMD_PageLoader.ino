@@ -64,6 +64,8 @@ int files = 0;
 
 unsigned long previousMillis = 0;
 
+uint8_t timebarPos = 1;
+
 void setup() {
   Serial.begin(9600);
 
@@ -82,6 +84,21 @@ void setup() {
     dispError(2);
     while (true) {
     }
+  }
+
+  if (!dir.exists("/timebar_pos")) {
+    char timebarBuf[2];
+    file.open("timebar_pos", FILE_WRITE);
+    itoa(timebarPos, timebarBuf, 10);
+    file.write(timebarBuf);
+    file.close();
+  } else {
+    char timebarBuf[2];
+    file.open("timebar_pos", FILE_READ);
+    file.readString().toCharArray(timebarBuf, 2);
+    timebarPos = atoi(timebarBuf);
+    Serial.println(timebarPos);
+    file.close();
   }
 
   // Loop through files and add names to fileNames
@@ -141,7 +158,11 @@ void loadPic(const uint8_t *pic) {
 
 void delayBar(int time) {
   for (int i = 0; i < 32; i++) {
-    dmd.setPixel(i, 31, GRAPHICS_XOR);
+    if (timebarPos == 1) {
+      dmd.setPixel(i, 31, GRAPHICS_XOR);
+    } else if (timebarPos == 2) {
+      dmd.setPixel(i, 0, GRAPHICS_XOR);
+    }
     while (1) {
       lcdUpdate();
       unsigned long currentMillis = millis();
