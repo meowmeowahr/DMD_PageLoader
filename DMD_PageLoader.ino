@@ -12,7 +12,12 @@
 #define MAX_FILE_LEN 18
 #define MAX_PAGES 80
 
-#define BRIGHTNESS 200
+#define HIGH_BRIGHTNESS 255
+#define MED_BRIGHTNESS 127
+#define LOW_BRIGHTNESS 20
+
+#define HIGH_PIN 22
+#define LOW_PIN 24
 
 // SDCARD_SS_PIN is defined for the built-in SD on some boards.
 #ifndef SDCARD_SS_PIN
@@ -64,17 +69,20 @@ int files = 0;
 
 unsigned long previousMillis = 0;
 
-uint8_t timebarPos = 1;
-uint16_t pageTime = 1000;
+int timebarPos = 1;
+int pageTime = 1000;
 
 void setup() {
+  pinMode(LOW_PIN, INPUT_PULLUP);
+  pinMode(HIGH_PIN, INPUT_PULLUP);
+
   Serial.begin(9600);
 
   dmd.begin();
-  dmd.setBrightness(BRIGHTNESS);
+  dmd.setBrightness(MED_BRIGHTNESS);
   dmd.selectFont(Arial_Black_16);
 
-  dispLoad(0);
+  dispLoad(33);
 
   // Initialize the SD.
   if (!sd.begin(SD_CONFIG)) {
@@ -83,7 +91,7 @@ void setup() {
     }
   }
 
-  dispLoad(20);
+  dispLoad(67);
 
   // Open root directory
   if (!dir.open("/")) {
@@ -91,42 +99,6 @@ void setup() {
     while (true) {
     }
   }
-
-  dispLoad(40);
-
-  if (!dir.exists("/timebar_pos")) {
-    char timebarBuf[2];
-    file.open("timebar_pos", FILE_WRITE);
-    itoa(timebarPos, timebarBuf, 10);
-    file.write(timebarBuf);
-    file.close();
-  } else {
-    char timebarBuf[2];
-    file.open("timebar_pos", FILE_READ);
-    file.readString().toCharArray(timebarBuf, 2);
-    timebarPos = atoi(timebarBuf);
-    Serial.println(timebarPos);
-    file.close();
-  }
-
-  dispLoad(60);
-
-  if (!dir.exists("/page_time")) {
-    char pagetimeBuf[7];
-    file.open("page_time", FILE_WRITE);
-    itoa(pageTime, pagetimeBuf, 10);
-    file.write(pagetimeBuf);
-    file.close();
-  } else {
-    char pagetimeBuf[7];
-    file.open("page_time", FILE_READ);
-    file.readString().toCharArray(pagetimeBuf, 7);
-    pageTime = atoi(pagetimeBuf);
-    Serial.println(timebarPos);
-    file.close();
-  }
-
-  dispLoad(80);
 
   // Loop through files and add names to fileNames
   while (file.openNext(&dir, O_RDONLY)) {
@@ -193,7 +165,7 @@ void delayBar(int time) {
       dmd.setPixel(i, 0, GRAPHICS_XOR);
     }
     while (1) {
-      lcdUpdate();
+      backgroundUpdate();
       unsigned long currentMillis = millis();
 
       if (currentMillis - previousMillis >= time) {
@@ -226,7 +198,14 @@ void dispLoad(uint8_t pcnt) {
   dmd.drawString(0, 17, strcat(pcntBuf, "%"));
 }
 
-void lcdUpdate() {
+void backgroundUpdate() {
+  if (!digitalRead(LOW_PIN)) {
+    dmd.setBrightness(LOW_BRIGHTNESS);
+  } else if (!digitalRead(HIGH_PIN)) {
+    dmd.setBrightness(HIGH_BRIGHTNESS);
+  } else {
+    dmd.setBrightness(MED_BRIGHTNESS);
+  }
   // TODO: Add LCD Features
 }
 
