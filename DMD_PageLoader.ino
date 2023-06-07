@@ -90,6 +90,8 @@ bool settingsLoaded = 0;
 bool paused = 0;
 
 unsigned int settingsSelectedItem = 0;
+int settingsActiveItem = -1;
+bool settingsScroll = true;
 
 unsigned int currentPic = 1;
 
@@ -257,12 +259,16 @@ void backgroundUpdate() {
   if (paused) {
     currentPic = euclidean_modulo(enc.read() / 4, files) + 1;
   } else if (settingsLoaded) {
-    if (settingsSelectedItem != euclidean_modulo(enc.read() / 4, 2)) {
-      settingsSelectedItem = euclidean_modulo(enc.read() / 4, 2);
-      buzzer.sound(NOTE_C2, 10);
-      dmd.drawFilledBox(0, 0, 5, 32, GRAPHICS_OFF); // clear carets
-      addSettingsItems();
-      drawArrow(settingsSelectedItem);
+    if (settingsScroll) {
+      if (settingsSelectedItem != euclidean_modulo(enc.read() / 4, 2)) {
+        settingsSelectedItem = euclidean_modulo(enc.read() / 4, 2);
+        buzzer.sound(NOTE_C2, 10);
+        dmd.clearScreen();
+        addSettingsItems();
+        drawArrow(settingsSelectedItem);
+      }
+    } else {
+      enc.write(settingsSelectedItem * 4);
     }
   }
 }
@@ -271,6 +277,17 @@ void onClick() {
   buzzer.sound(NOTE_C3, 10);
   if (!settingsLoaded) {
     paused = !paused;
+  } else {
+    if (settingsActiveItem == settingsSelectedItem) {
+      settingsActiveItem = -1;
+      settingsScroll = true;
+    } else {
+      settingsActiveItem = settingsSelectedItem;
+      settingsScroll = false;
+    }
+    dmd.clearScreen();
+    addSettingsItems();
+    drawArrow(settingsSelectedItem);
   }
 }
 
@@ -286,17 +303,24 @@ void onLong() {
   if (settingsLoaded) {
     addSettingsItems();
     drawArrow(settingsSelectedItem);
+  } else {
+    settingsActiveItem = -1;
+    settingsSelectedItem = 0;
   }
 }
 
 void addSettingsItems() {
   dmd.selectFont(SystemFont5x7);
-  dmd.drawString(5, 0, "SP");
-  dmd.drawString(5, 9, "TB");
+  dmd.drawString(0, 0, "SP");
+  dmd.drawString(0, 9, "TB");
 }
 
 void drawArrow(int pos) {
-  dmd.drawString(1, pos * 8, ">");
+  if (pos == settingsActiveItem) {
+    dmd.drawString(27, pos * 8 + pos, "<");
+  } else {
+    dmd.drawString(27, pos * 8 + pos, "(");
+  }
 }
 
 int EndsWith(const char *str, const char *suffix) {
