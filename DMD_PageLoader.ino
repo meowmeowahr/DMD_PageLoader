@@ -3,6 +3,9 @@
 #include "Droid_Sans_12.h"
 #include <SPI.h>
 #include <DMD2.h>
+#include <Buzzer.h>
+#include <OneButton.h>
+#include <Encoder.h>
 
 // SD_FAT_TYPE = 0 for SdFat/File as defined in SdFatConfig.h,
 // 1 for FAT16/FAT32, 2 for exFAT, 3 for FAT16/FAT32 and exFAT.
@@ -18,6 +21,11 @@
 
 #define HIGH_PIN 22
 #define LOW_PIN 24
+#define BUZZER_PIN 26
+
+#define ENC_BTN A1
+#define ENC_A 2
+#define ENC_B 3
 
 // SDCARD_SS_PIN is defined for the built-in SD on some boards.
 #ifndef SDCARD_SS_PIN
@@ -62,15 +70,26 @@ FsFile file;
 #define VERSION "0.1.0"
 
 SoftDMD dmd(1, 2);  // DMD controls the entire display(s)
+Buzzer buzzer(BUZZER_PIN, -1);
+OneButton btn(ENC_BTN);
+Encoder enc(ENC_A, ENC_B);
 
 char fileNames[MAX_FILE_LEN][MAX_PAGES];
 uint8_t fileBuffer[1024];
 int files = 0;
 
 unsigned long previousMillis = 0;
+unsigned long btnPress = 0;
+unsigned long btnRelease = 0;
 
 int timebarPos = 1;
 int pageTime = 1000;
+
+int page = 0;
+bool settingsLoaded = 0;
+bool paused = 0;
+
+unsigned int currentPic = 1;
 
 void setup() {
   pinMode(LOW_PIN, INPUT_PULLUP);
@@ -81,6 +100,10 @@ void setup() {
   dmd.begin();
   dmd.setBrightness(MED_BRIGHTNESS);
   dmd.selectFont(Arial_Black_16);
+
+  buzzer.begin(10);
+
+  btn.attachClick(onClick);
 
   dispLoad(33);
 
@@ -120,18 +143,27 @@ void setup() {
 }
 
 void loop() {
-  for (int i = 1; i < files; i++) {
-    if (EndsWith(fileNames[i], ".DMD")) {
-      if (file.open(fileNames[i], FILE_READ)) {
-        file.readBytes(fileBuffer, 1024);
-        loadPic(fileBuffer);
-        delayBar(pageTime / 32);
-      } else {
-        dispError(4);
-        while (true) {
+  for (currentPic = 1; currentPic < files;) {
+    if (page == 0) {
+      if (EndsWith(fileNames[currentPic], ".DMD")) {
+        if (file.open(fileNames[currentPic], FILE_READ)) {
+          file.readBytes(fileBuffer, 1024);
+          loadPic(fileBuffer);
+          delayBar(pageTime / 32);
+        } else {
+          dispError(4);
+          while (true) {
+          }
         }
+        file.close();
+      } else {
+        backgroundUpdate();
       }
-      file.close();
+      if (!paused) {
+        currentPic++;
+      }
+    } else {
+      backgroundUpdate();
     }
   }
 }
@@ -159,14 +191,20 @@ void loadPic(const uint8_t *pic) {
 
 void delayBar(int time) {
   for (int i = 0; i < 32; i++) {
-    if (timebarPos == 1) {
-      dmd.setPixel(i, 31, GRAPHICS_XOR);
-    } else if (timebarPos == 2) {
-      dmd.setPixel(i, 0, GRAPHICS_XOR);
+    if (!paused) {
+      if (timebarPos == 1) {
+        dmd.setPixel(i, 31, GRAPHICS_XOR);
+      } else if (timebarPos == 2) {
+        dmd.setPixel(i, 0, GRAPHICS_XOR);
+      }
     }
     while (1) {
       backgroundUpdate();
       unsigned long currentMillis = millis();
+
+      if (paused) {
+        break;
+      }
 
       if (currentMillis - previousMillis >= time) {
         previousMillis = currentMillis;
@@ -207,6 +245,15 @@ void backgroundUpdate() {
     dmd.setBrightness(MED_BRIGHTNESS);
   }
   // TODO: Add LCD Features
+  btn.tick();
+
+  if (paused) {
+    currentPic = euclidean_modulo(enc.read() / 4, files) + 1;
+  }
+}
+
+void onClick() {
+  paused = !paused;
 }
 
 int EndsWith(const char *str, const char *suffix) {
@@ -217,4 +264,13 @@ int EndsWith(const char *str, const char *suffix) {
   if (lensuffix > lenstr)
     return 0;
   return strncasecmp(str + lenstr - lensuffix, suffix, lensuffix) == 0;
+}
+
+int euclidean_modulo(int a, int b) {
+  int m = a % b;
+  if (m < 0) {
+    // m += (b < 0) ? -b : b; // avoid this form: it is UB when b == INT_MIN
+    m = (b < 0) ? m - b : m + b;
+  }
+  return m;
 }
