@@ -38,10 +38,10 @@
 // SDCARD_SS_PIN is defined for the built-in SD on some boards.
 #ifndef SDCARD_SS_PIN
 const uint8_t SD_CS_PIN = SS;
-#else  // SDCARD_SS_PIN
+#else   // SDCARD_SS_PIN
 // Assume built-in SD is used.
 const uint8_t SD_CS_PIN = SDCARD_SS_PIN;
-#endif // SDCARD_SS_PIN
+#endif  // SDCARD_SS_PIN
 
 // Try max SPI clock for an SD. Reduce SPI_CLOCK if errors occur.
 #define SPI_CLOCK SD_SCK_MHZ(50)
@@ -51,9 +51,9 @@ const uint8_t SD_CS_PIN = SDCARD_SS_PIN;
 #define SD_CONFIG SdioConfig(FIFO_SDIO)
 #elif ENABLE_DEDICATED_SPI
 #define SD_CONFIG SdSpiConfig(SD_CS_PIN, DEDICATED_SPI, SPI_CLOCK)
-#else // HAS_SDIO_CLASS
+#else  // HAS_SDIO_CLASS
 #define SD_CONFIG SdSpiConfig(SD_CS_PIN, SHARED_SPI, SPI_CLOCK)
-#endif // HAS_SDIO_CLASS
+#endif  // HAS_SDIO_CLASS
 
 #if SD_FAT_TYPE == 0
 SdFat sd;
@@ -71,13 +71,13 @@ ExFile file;
 SdFs sd;
 FsFile dir;
 FsFile file;
-#else // SD_FAT_TYPE
+#else  // SD_FAT_TYPE
 #error invalid SD_FAT_TYPE
-#endif // SD_FAT_TYPE
+#endif  // SD_FAT_TYPE
 
 #define VERSION "0.1.0"
 
-SoftDMD dmd(1, 2); // DMD controls the entire display(s)
+SoftDMD dmd(1, 2);  // DMD controls the entire display(s)
 Buzzer buzzer(BUZZER_PIN, LED_BUILTIN);
 OneButton btn(ENC_BTN);
 Encoder enc(ENC_A, ENC_B);
@@ -196,6 +196,10 @@ void loadSettings() {
   if (inRange(EEPROM.readInt(EEPROM_BASE), 0, 9990)) {
     pageTime = EEPROM.readInt(EEPROM_BASE);
   }
+
+  if (inRange(EEPROM.readByte(EEPROM_BASE + 2), 0, 2)) {
+    timebarPos = EEPROM.readByte(EEPROM_BASE + 2);
+  }
 }
 
 void loadPic(const uint8_t *pic) {
@@ -288,6 +292,15 @@ void backgroundUpdate() {
         addSettingsItems();
         drawArrow(settingsSelectedItem);
       }
+    } else if (settingsActiveItem == 1) {
+      if (settingsCurrentValue != euclidean_modulo(enc.read() / 4, 3)) {
+        settingsCurrentValue = euclidean_modulo(enc.read() / 4, 3);
+        timebarPos = settingsCurrentValue;
+        Serial.println(timebarPos);
+        dmd.clearScreen();
+        addSettingsItems();
+        drawArrow(settingsSelectedItem);
+      }
     }
   }
 }
@@ -307,6 +320,8 @@ void onClick() {
 
       if (settingsActiveItem == 0) {
         enc.write(pageTime / 10 * 4);
+      } else if (settingsActiveItem == 1) {
+        enc.write(timebarPos * 4);
       }
     }
     dmd.clearScreen();
@@ -334,6 +349,7 @@ void onLong() {
 
     // Save settings
     EEPROM.writeInt(EEPROM_BASE, pageTime);
+    EEPROM.writeByte(EEPROM_BASE + 2, timebarPos);
   }
 }
 
@@ -344,6 +360,7 @@ void addSettingsItems() {
 
   dmd.selectFont(NumberFont3x5);
   dmd.drawString(14, 1, String(pageTime / 10));
+  dmd.drawString(14, 10, String(timebarPos));
 }
 
 void drawArrow(int pos) {
