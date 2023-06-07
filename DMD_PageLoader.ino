@@ -262,7 +262,6 @@ void backgroundUpdate() {
     if (settingsScroll) {
       if (settingsSelectedItem != euclidean_modulo(enc.read() / 4, 2)) {
         settingsSelectedItem = euclidean_modulo(enc.read() / 4, 2);
-        buzzer.sound(NOTE_C2, 10);
         dmd.clearScreen();
         addSettingsItems();
         drawArrow(settingsSelectedItem);
