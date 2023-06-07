@@ -1,6 +1,7 @@
 #include "SdFat.h"
 #include "Arial_Black_16.h"
 #include "Droid_Sans_12.h"
+#include "SystemFont5x7.h"
 #include <SPI.h>
 #include <DMD2.h>
 #include <Buzzer.h>
@@ -21,7 +22,7 @@
 
 #define HIGH_PIN 22
 #define LOW_PIN 24
-#define BUZZER_PIN 26
+#define BUZZER_PIN 4
 
 #define ENC_BTN A1
 #define ENC_A 2
@@ -70,7 +71,7 @@ FsFile file;
 #define VERSION "0.1.0"
 
 SoftDMD dmd(1, 2);  // DMD controls the entire display(s)
-Buzzer buzzer(BUZZER_PIN, -1);
+Buzzer buzzer(BUZZER_PIN, LED_BUILTIN);
 OneButton btn(ENC_BTN);
 Encoder enc(ENC_A, ENC_B);
 
@@ -85,11 +86,16 @@ unsigned long btnRelease = 0;
 int timebarPos = 1;
 int pageTime = 1000;
 
-int page = 0;
 bool settingsLoaded = 0;
 bool paused = 0;
 
+unsigned int settingsSelectedItem = 0;
+
 unsigned int currentPic = 1;
+
+uint8_t arrowGFX[] = {
+  1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0
+};
 
 void setup() {
   pinMode(LOW_PIN, INPUT_PULLUP);
@@ -104,6 +110,7 @@ void setup() {
   buzzer.begin(10);
 
   btn.attachClick(onClick);
+  btn.attachLongPressStart(onLong);
 
   dispLoad(33);
 
@@ -144,7 +151,7 @@ void setup() {
 
 void loop() {
   for (currentPic = 1; currentPic < files;) {
-    if (page == 0) {
+    if (settingsLoaded == 0) {
       if (EndsWith(fileNames[currentPic], ".DMD")) {
         if (file.open(fileNames[currentPic], FILE_READ)) {
           file.readBytes(fileBuffer, 1024);
@@ -191,7 +198,7 @@ void loadPic(const uint8_t *pic) {
 
 void delayBar(int time) {
   for (int i = 0; i < 32; i++) {
-    if (!paused) {
+    if (!paused and !settingsLoaded) {
       if (timebarPos == 1) {
         dmd.setPixel(i, 31, GRAPHICS_XOR);
       } else if (timebarPos == 2) {
@@ -202,7 +209,7 @@ void delayBar(int time) {
       backgroundUpdate();
       unsigned long currentMillis = millis();
 
-      if (paused) {
+      if (paused or settingsLoaded) {
         break;
       }
 
@@ -249,11 +256,47 @@ void backgroundUpdate() {
 
   if (paused) {
     currentPic = euclidean_modulo(enc.read() / 4, files) + 1;
+  } else if (settingsLoaded) {
+    if (settingsSelectedItem != euclidean_modulo(enc.read() / 4, 2)) {
+      settingsSelectedItem = euclidean_modulo(enc.read() / 4, 2);
+      buzzer.sound(NOTE_C2, 10);
+      dmd.drawFilledBox(0, 0, 5, 32, GRAPHICS_OFF); // clear carets
+      addSettingsItems();
+      drawArrow(settingsSelectedItem);
+    }
   }
 }
 
 void onClick() {
-  paused = !paused;
+  buzzer.sound(NOTE_C3, 10);
+  if (!settingsLoaded) {
+    paused = !paused;
+  }
+}
+
+void onLong() {
+  if (!paused) {
+    settingsLoaded = !settingsLoaded;
+    dmd.clearScreen();
+    buzzer.sound(NOTE_C3, 10);
+    buzzer.sound(0, 5);
+    buzzer.sound(NOTE_C3, 10);
+  }
+
+  if (settingsLoaded) {
+    addSettingsItems();
+    drawArrow(settingsSelectedItem);
+  }
+}
+
+void addSettingsItems() {
+  dmd.selectFont(SystemFont5x7);
+  dmd.drawString(5, 0, "SP");
+  dmd.drawString(5, 9, "TB");
+}
+
+void drawArrow(int pos) {
+  dmd.drawString(1, pos * 8, ">");
 }
 
 int EndsWith(const char *str, const char *suffix) {
