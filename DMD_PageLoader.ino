@@ -2,6 +2,7 @@
 #include "Arial_Black_16.h"
 #include "Droid_Sans_12.h"
 #include "SystemFont5x7.h"
+#include "NumberFont3x5.h"
 #include <SPI.h>
 #include <DMD2.h>
 #include <Buzzer.h>
@@ -92,6 +93,7 @@ bool paused = 0;
 unsigned int settingsSelectedItem = 0;
 int settingsActiveItem = -1;
 bool settingsScroll = true;
+int settingsCurrentValue;
 
 unsigned int currentPic = 1;
 
@@ -253,7 +255,7 @@ void backgroundUpdate() {
   } else {
     dmd.setBrightness(MED_BRIGHTNESS);
   }
-  // TODO: Add LCD Features
+
   btn.tick();
 
   if (paused) {
@@ -266,8 +268,14 @@ void backgroundUpdate() {
         addSettingsItems();
         drawArrow(settingsSelectedItem);
       }
-    } else {
-      enc.write(settingsSelectedItem * 4);
+    } else if (settingsActiveItem == 0) {
+      if (settingsCurrentValue != euclidean_modulo(enc.read() / 4, 1000)) {
+        settingsCurrentValue = euclidean_modulo(enc.read() / 4, 1000);
+        pageTime = settingsCurrentValue * 10;
+        dmd.clearScreen();
+        addSettingsItems();
+        drawArrow(settingsSelectedItem);
+      }
     }
   }
 }
@@ -278,11 +286,16 @@ void onClick() {
     paused = !paused;
   } else {
     if (settingsActiveItem == settingsSelectedItem) {
+      enc.write(settingsSelectedItem * 4);
       settingsActiveItem = -1;
       settingsScroll = true;
     } else {
       settingsActiveItem = settingsSelectedItem;
       settingsScroll = false;
+
+      if (settingsActiveItem == 0) {
+        enc.write(pageTime / 10 * 4);
+      }
     }
     dmd.clearScreen();
     addSettingsItems();
@@ -305,6 +318,7 @@ void onLong() {
   } else {
     settingsActiveItem = -1;
     settingsSelectedItem = 0;
+    settingsScroll = true;
   }
 }
 
@@ -312,9 +326,13 @@ void addSettingsItems() {
   dmd.selectFont(SystemFont5x7);
   dmd.drawString(0, 0, "SP");
   dmd.drawString(0, 9, "TB");
+
+  dmd.selectFont(NumberFont3x5);
+  dmd.drawString(14, 1, String(pageTime / 10));
 }
 
 void drawArrow(int pos) {
+  dmd.selectFont(SystemFont5x7);
   if (pos == settingsActiveItem) {
     dmd.drawString(27, pos * 8 + pos, "<");
   } else {
