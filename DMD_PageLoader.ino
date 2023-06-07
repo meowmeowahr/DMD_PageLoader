@@ -3,6 +3,7 @@
 #include <SdFat.h>
 
 #include <Buzzer.h>
+#include <EEPROMex.h>
 #include <Encoder.h>
 #include <OneButton.h>
 
@@ -18,6 +19,9 @@
 // Maximum file name length (with extention)
 #define MAX_FILE_LEN 18
 #define MAX_PAGES 80
+
+#define EEPROM_MAX_WRITES 80
+#define EEPROM_BASE 350
 
 #define HIGH_BRIGHTNESS 255
 #define MED_BRIGHTNESS 127
@@ -114,6 +118,8 @@ void setup() {
   btn.attachClick(onClick);
   btn.attachLongPressStart(onLong);
 
+  loadSettings();
+
   dispLoad(33);
 
   // Initialize the SD.
@@ -181,6 +187,14 @@ void wipeAni() {
   for (int i = 0; i < 32; i++) {
     dmd.drawLine(0, i, 31, i);
     delay(10);
+  }
+}
+
+void loadSettings() {
+  EEPROM.setMemPool(EEPROM_BASE, EEPROMSizeMega);
+  EEPROM.setMaxAllowedWrites(EEPROM_MAX_WRITES);
+  if (inRange(EEPROM.readInt(EEPROM_BASE), 0, 9990)) {
+    pageTime = EEPROM.readInt(EEPROM_BASE);
   }
 }
 
@@ -317,6 +331,9 @@ void onLong() {
     settingsActiveItem = -1;
     settingsSelectedItem = 0;
     settingsScroll = true;
+
+    // Save settings
+    EEPROM.writeInt(EEPROM_BASE, pageTime);
   }
 }
 
@@ -355,4 +372,8 @@ int euclidean_modulo(int a, int b) {
     m = (b < 0) ? m - b : m + b;
   }
   return m;
+}
+
+bool inRange(int val, int minimum, int maximum) {
+  return ((minimum <= val) && (val <= maximum));
 }
