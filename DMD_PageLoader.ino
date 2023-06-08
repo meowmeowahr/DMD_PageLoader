@@ -23,12 +23,6 @@
 #define EEPROM_MAX_WRITES 80
 #define EEPROM_BASE 350
 
-#define HIGH_BRIGHTNESS 255
-#define MED_BRIGHTNESS 127
-#define LOW_BRIGHTNESS 20
-
-#define HIGH_PIN 22
-#define LOW_PIN 24
 #define BUZZER_PIN 4
 
 #define ENC_BTN A1
@@ -78,7 +72,7 @@ FsFile file;
 #define VERSION "0.1.0"
 
 SoftDMD dmd(1, 2); // DMD controls the entire display(s)
-Buzzer buzzer(BUZZER_PIN, LED_BUILTIN);
+Buzzer buzzer(BUZZER_PIN);
 OneButton btn(ENC_BTN);
 Encoder enc(ENC_A, ENC_B);
 
@@ -96,6 +90,8 @@ int pageTime = 1000;
 bool settingsLoaded = 0;
 bool paused = 0;
 
+int brightness = 127;
+
 unsigned int settingsSelectedItem = 0;
 int settingsActiveItem = -1;
 bool settingsScroll = true;
@@ -104,13 +100,10 @@ int settingsCurrentValue;
 unsigned int currentPic = 1;
 
 void setup() {
-  pinMode(LOW_PIN, INPUT_PULLUP);
-  pinMode(HIGH_PIN, INPUT_PULLUP);
-
   Serial.begin(9600);
 
   dmd.begin();
-  dmd.setBrightness(MED_BRIGHTNESS);
+  dmd.setBrightness(brightness);
   dmd.selectFont(Arial_Black_16);
 
   buzzer.begin(10);
@@ -126,6 +119,10 @@ void setup() {
   if (!sd.begin(SD_CONFIG)) {
     dispError(1);
     while (true) {
+      buzzer.sound(NOTE_C2, 100);
+      buzzer.sound(0, 50);
+      buzzer.sound(NOTE_C2, 100);
+      buzzer.sound(0, 150);
     }
   }
 
@@ -135,6 +132,10 @@ void setup() {
   if (!dir.open("/")) {
     dispError(2);
     while (true) {
+      buzzer.sound(NOTE_C2, 100);
+      buzzer.sound(0, 50);
+      buzzer.sound(NOTE_C2, 100);
+      buzzer.sound(0, 150);
     }
   }
 
@@ -149,6 +150,10 @@ void setup() {
   if (dir.getError()) {
     dispError(3);
     while (true) {
+      buzzer.sound(NOTE_C2, 100);
+      buzzer.sound(0, 50);
+      buzzer.sound(NOTE_C2, 100);
+      buzzer.sound(0, 150);
     }
   }
 
@@ -168,6 +173,10 @@ void loop() {
         } else {
           dispError(4);
           while (true) {
+            buzzer.sound(NOTE_C2, 100);
+            buzzer.sound(0, 50);
+            buzzer.sound(NOTE_C2, 100);
+            buzzer.sound(0, 150);
           }
         }
         file.close();
@@ -199,6 +208,10 @@ void loadSettings() {
 
   if (inRange(EEPROM.readByte(EEPROM_BASE + 2), 0, 2)) {
     timebarPos = EEPROM.readByte(EEPROM_BASE + 2);
+  }
+
+  if (inRange(EEPROM.readByte(EEPROM_BASE + 3), 1, 255)) {
+    brightness = EEPROM.readByte(EEPROM_BASE + 3);
   }
 }
 
@@ -264,13 +277,7 @@ void dispLoad(uint8_t pcnt) {
 }
 
 void backgroundUpdate() {
-  if (!digitalRead(LOW_PIN)) {
-    dmd.setBrightness(LOW_BRIGHTNESS);
-  } else if (!digitalRead(HIGH_PIN)) {
-    dmd.setBrightness(HIGH_BRIGHTNESS);
-  } else {
-    dmd.setBrightness(MED_BRIGHTNESS);
-  }
+  dmd.setBrightness(brightness);
 
   btn.tick();
 
@@ -278,8 +285,8 @@ void backgroundUpdate() {
     currentPic = euclidean_modulo(enc.read() / 4, files) + 1;
   } else if (settingsLoaded) {
     if (settingsScroll) {
-      if (settingsSelectedItem != euclidean_modulo(enc.read() / 4, 2)) {
-        settingsSelectedItem = euclidean_modulo(enc.read() / 4, 2);
+      if (settingsSelectedItem != euclidean_modulo(enc.read() / 4, 3)) {
+        settingsSelectedItem = euclidean_modulo(enc.read() / 4, 3);
         dmd.clearScreen();
         addSettingsItems();
         drawArrow(settingsSelectedItem);
@@ -296,7 +303,19 @@ void backgroundUpdate() {
       if (settingsCurrentValue != euclidean_modulo(enc.read() / 4, 3)) {
         settingsCurrentValue = euclidean_modulo(enc.read() / 4, 3);
         timebarPos = settingsCurrentValue;
-        Serial.println(timebarPos);
+        dmd.clearScreen();
+        addSettingsItems();
+        drawArrow(settingsSelectedItem);
+      }
+    } else if (settingsActiveItem == 2) {
+      if (settingsCurrentValue != euclidean_modulo(enc.read() / 4, 256)) {
+        settingsCurrentValue = euclidean_modulo(enc.read() / 4, 256);
+        brightness = settingsCurrentValue;
+
+        if (brightness == 0) {
+          brightness = 1;
+        }
+
         dmd.clearScreen();
         addSettingsItems();
         drawArrow(settingsSelectedItem);
@@ -322,6 +341,8 @@ void onClick() {
         enc.write(pageTime / 10 * 4);
       } else if (settingsActiveItem == 1) {
         enc.write(timebarPos * 4);
+      } else if (settingsActiveItem == 2) {
+        enc.write(brightness * 4);
       }
     }
     dmd.clearScreen();
@@ -350,6 +371,7 @@ void onLong() {
     // Save settings
     EEPROM.writeInt(EEPROM_BASE, pageTime);
     EEPROM.writeByte(EEPROM_BASE + 2, timebarPos);
+    EEPROM.writeByte(EEPROM_BASE + 3, brightness);
   }
 }
 
@@ -357,10 +379,12 @@ void addSettingsItems() {
   dmd.selectFont(SystemFont5x7);
   dmd.drawString(0, 0, "SP");
   dmd.drawString(0, 9, "TB");
+  dmd.drawString(0, 18, "BR");
 
   dmd.selectFont(NumberFont3x5);
   dmd.drawString(14, 1, String(pageTime / 10));
   dmd.drawString(14, 10, String(timebarPos));
+  dmd.drawString(14, 19, String(brightness));
 }
 
 void drawArrow(int pos) {
