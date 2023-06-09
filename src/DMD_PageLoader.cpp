@@ -99,6 +99,21 @@ int settingsCurrentValue;
 
 unsigned int currentPic = 1;
 
+void wipeAni();
+void loadSettings();
+void loadPic(const uint8_t *pic);
+void delayBar(int time);
+void dispError(uint8_t code);
+void dispLoad(uint8_t pcnt);
+void backgroundUpdate();
+void onClick();
+void onLong();
+void addSettingsItems();
+void drawArrow(int pos);
+int EndsWith(const char *str, const char *suffix);
+int euclidean_modulo(int a, int b);
+bool inRange(int val, int minimum, int maximum);
+
 void setup() {
   Serial.begin(9600);
 
