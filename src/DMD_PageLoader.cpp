@@ -78,7 +78,7 @@ Encoder enc(ENC_A, ENC_B);
 
 char fileNames[MAX_FILE_LEN][MAX_PAGES];
 uint8_t fileBuffer[1024];
-int files = 0;
+unsigned int files = 0;
 
 unsigned long previousMillis = 0;
 unsigned long btnPress = 0;
@@ -92,7 +92,7 @@ bool paused = 0;
 
 int brightness = 127;
 
-unsigned int settingsSelectedItem = 0;
+int settingsSelectedItem = 0;
 int settingsActiveItem = -1;
 bool settingsScroll = true;
 int settingsCurrentValue;
@@ -100,18 +100,31 @@ int settingsCurrentValue;
 unsigned int currentPic = 1;
 
 void wipeAni();
+
 void loadSettings();
+
 void loadPic(const uint8_t *pic);
-void delayBar(int time);
+
+void delayBar(unsigned int time);
+
 void dispError(uint8_t code);
+
 void dispLoad(uint8_t pcnt);
+
 void backgroundUpdate();
+
 void onClick();
+
 void onLong();
+
 void addSettingsItems();
+
 void drawArrow(int pos);
+
 int EndsWith(const char *str, const char *suffix);
+
 int euclidean_modulo(int a, int b);
+
 bool inRange(int val, int minimum, int maximum);
 
 void setup() {
@@ -244,7 +257,7 @@ void loadPic(const uint8_t *pic) {
   }
 }
 
-void delayBar(int time) {
+void delayBar(unsigned int time) {
   for (int i = 0; i < 32; i++) {
     if (!paused and !settingsLoaded) {
       if (timebarPos == 1) {
