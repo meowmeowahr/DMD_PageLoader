@@ -240,6 +240,7 @@ void loadSettings() {
 
   if (inRange(EEPROM.readByte(EEPROM_BASE + 3), 1, 255)) {
     brightness = EEPROM.readByte(EEPROM_BASE + 3);
+    dmd.setBrightness(brightness);
   }
 }
 
@@ -305,7 +306,6 @@ void dispLoad(uint8_t pcnt) {
 }
 
 void backgroundUpdate() {
-  dmd.setBrightness(brightness);
 
   btn.tick();
 
@@ -336,13 +336,10 @@ void backgroundUpdate() {
         drawArrow(settingsSelectedItem);
       }
     } else if (settingsActiveItem == 2) {
-      if (settingsCurrentValue != euclidean_modulo(enc.read() / 4, 256)) {
-        settingsCurrentValue = euclidean_modulo(enc.read() / 4, 256);
-        brightness = settingsCurrentValue;
-
-        if (brightness == 0) {
-          brightness = 1;
-        }
+      if (settingsCurrentValue != euclidean_modulo(enc.read() / 4, 255)) {
+        settingsCurrentValue = euclidean_modulo(enc.read() / 4, 255);
+        brightness = settingsCurrentValue + 1;
+        dmd.setBrightness(brightness);
 
         dmd.clearScreen();
         addSettingsItems();
@@ -370,7 +367,7 @@ void onClick() {
       } else if (settingsActiveItem == 1) {
         enc.write(timebarPos * 4);
       } else if (settingsActiveItem == 2) {
-        enc.write(brightness * 4);
+        enc.write((brightness - 1) * 4);
       }
     }
     dmd.clearScreen();
