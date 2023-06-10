@@ -34,7 +34,8 @@ Show images on 2 32x16 HUB12 panels.
 
 | Byte Range       |            Description             |
 | ---------------- | ---------------------------------- |
-| 0 ... 1023 (3FF) | Image Data (0 = OFF, 1 = ON)       |
+| 0 (h0)                 | Page Time Multiplier         |
+| 1 (h1) ... 1024 (h400) | Image Data (0 = OFF, 1 = ON) |
 
 ## Error Codes
 

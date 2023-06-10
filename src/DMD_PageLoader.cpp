@@ -77,7 +77,7 @@ OneButton btn(ENC_BTN);
 Encoder enc(ENC_A, ENC_B);
 
 char fileNames[MAX_FILE_LEN][MAX_PAGES];
-uint8_t fileBuffer[1024];
+uint8_t fileBuffer[1025];
 unsigned int files = 0;
 
 unsigned long previousMillis = 0;
@@ -86,6 +86,7 @@ unsigned long btnRelease = 0;
 
 int timebarPos = 1;
 int pageTime = 1000;
+int pageTimeMult = 1;
 
 bool settingsLoaded = 0;
 bool paused = 0;
@@ -195,9 +196,10 @@ void loop() {
     if (settingsLoaded == 0) {
       if (EndsWith(fileNames[currentPic], ".DMD")) {
         if (file.open(fileNames[currentPic], FILE_READ)) {
-          file.readBytes(fileBuffer, 1024);
+          file.readBytes(fileBuffer, 1025);
+          pageTimeMult = fileBuffer[0];
           loadPic(fileBuffer);
-          delayBar(pageTime / 32);
+          delayBar(pageTime / 32  * pageTimeMult);
         } else {
           dispError(4);
           while (true) {
@@ -245,7 +247,7 @@ void loadSettings() {
 }
 
 void loadPic(const uint8_t *pic) {
-  int p = 0;
+  int p = 1;
   for (int y = 0; y < 32; y++) {
     for (int x = 0; x < 32; x++) {
       if (pic[p] == 1) {
