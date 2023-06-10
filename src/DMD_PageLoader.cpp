@@ -1,3 +1,8 @@
+/*
+DMD Page Loader
+Author: Kevin Ahr
+*/
+
 #include <DMD2.h>
 #include <SPI.h>
 #include <SdFat.h>
@@ -199,7 +204,7 @@ void loop() {
           file.readBytes(fileBuffer, 1025);
           pageTimeMult = fileBuffer[0];
           loadPic(fileBuffer);
-          delayBar(pageTime / 32  * pageTimeMult);
+          delayBar(pageTime / 32 * pageTimeMult);
         } else {
           dispError(4);
           while (true) {
