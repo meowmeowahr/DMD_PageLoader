@@ -410,21 +410,21 @@ void onLong() {
 void addSettingsItems() {
   dmd.selectFont(SystemFont5x7);
   dmd.drawString(0, 0, "SP");
-  dmd.drawString(0, 9, "TB");
-  dmd.drawString(0, 18, "BR");
+  dmd.drawString(0, 8, "TB");
+  dmd.drawString(0, 16, "BR");
 
   dmd.selectFont(NumberFont3x5);
   dmd.drawString(14, 1, String(pageTime / 10));
-  dmd.drawString(14, 10, String(timebarPos));
-  dmd.drawString(14, 19, String(brightness));
+  dmd.drawString(14, 9, String(timebarPos));
+  dmd.drawString(14, 17, String(brightness));
 }
 
 void drawArrow(int pos) {
   dmd.selectFont(SystemFont5x7);
   if (pos == settingsActiveItem) {
-    dmd.drawString(27, pos * 8 + pos, "<");
+    dmd.drawString(27, pos * 8, "<");
   } else {
-    dmd.drawString(27, pos * 8 + pos, "(");
+    dmd.drawString(27, pos * 8, "(");
   }
 }
 
