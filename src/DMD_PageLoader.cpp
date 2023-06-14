@@ -28,9 +28,9 @@ Author: Kevin Ahr
 #define EEPROM_MAX_WRITES 80
 #define EEPROM_BASE 350
 
-#define BUZZER_PIN 4
+#define BUZZER_PIN 22
 
-#define ENC_BTN A1
+#define ENC_BTN 4
 #define ENC_A 2
 #define ENC_B 3
 
