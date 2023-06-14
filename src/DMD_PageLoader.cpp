@@ -31,8 +31,8 @@ Author: Kevin Ahr
 #define BUZZER_PIN 22
 
 #define ENC_BTN 4
-#define ENC_A 2
-#define ENC_B 3
+#define ENC_A 3
+#define ENC_B 2
 
 // SDCARD_SS_PIN is defined for the built-in SD on some boards.
 #ifndef SDCARD_SS_PIN
