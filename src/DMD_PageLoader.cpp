@@ -23,7 +23,7 @@ Author: Kevin Ahr
 
 // Maximum file name length (with extention)
 #define MAX_FILE_LEN 18
-#define MAX_PAGES 80
+#define MAX_PAGES 101
 
 #define EEPROM_MAX_WRITES 80
 #define EEPROM_BASE 350
@@ -81,7 +81,7 @@ Buzzer buzzer(BUZZER_PIN);
 OneButton btn(ENC_BTN);
 Encoder enc(ENC_A, ENC_B);
 
-char fileNames[MAX_FILE_LEN][MAX_PAGES];
+char fileNames[MAX_PAGES][MAX_FILE_LEN];
 uint8_t fileBuffer[1025];
 unsigned int files = 0;
 
@@ -202,9 +202,13 @@ void loop() {
       if (EndsWith(fileNames[currentPic], ".DMD")) {
         if (file.open(fileNames[currentPic], FILE_READ)) {
           file.readBytes(fileBuffer, 1025);
-          pageTimeMult = fileBuffer[0];
           loadPic(fileBuffer);
-          delayBar(pageTime / 32 * pageTimeMult);
+          if (pageTime > 0) {
+            pageTimeMult = fileBuffer[0];
+            delayBar(pageTime / 32 * pageTimeMult);
+          } else {
+            backgroundUpdate();
+          }
         } else {
           dispError(4);
           while (true) {
