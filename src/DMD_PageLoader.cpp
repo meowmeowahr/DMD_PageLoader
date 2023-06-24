@@ -23,7 +23,7 @@ Author: Kevin Ahr
 
 // Maximum file name length (with extention)
 #define MAX_FILE_LEN 18
-#define MAX_PAGES 101
+#define MAX_PAGES 251
 
 #define EEPROM_MAX_WRITES 80
 #define EEPROM_BASE 350
