@@ -22,8 +22,8 @@ Author: Kevin Ahr
 #define SD_FAT_TYPE 1
 
 // Maximum file name length (with extention)
-#define MAX_FILE_LEN 18
-#define MAX_PAGES 251
+#define MAX_FILE_LEN 15
+#define MAX_PAGES 301
 
 #define EEPROM_MAX_WRITES 80
 #define EEPROM_BASE 350
