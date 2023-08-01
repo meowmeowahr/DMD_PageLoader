@@ -74,7 +74,7 @@ FsFile file;
 #error invalid SD_FAT_TYPE
 #endif // SD_FAT_TYPE
 
-#define VERSION "0.1.0"
+#define VERSION "V100"
 
 SoftDMD dmd(1, 2); // DMD controls the entire display(s)
 Buzzer buzzer(BUZZER_PIN);
@@ -416,6 +416,7 @@ void addSettingsItems() {
   dmd.drawString(0, 0, "SP");
   dmd.drawString(0, 8, "TB");
   dmd.drawString(0, 16, "BR");
+  dmd.drawString(0, 24, VERSION);
 
   dmd.selectFont(NumberFont3x5);
   dmd.drawString(14, 1, String(pageTime / 10));
