@@ -11,6 +11,7 @@ Author: Kevin Ahr
 #include <EEPROMex.h>
 #include <Encoder.h>
 #include <OneButton.h>
+#include <MemoryFree.h>
 
 #include "Arial_Black_16.h"
 #include "Droid_Sans_12.h"
@@ -23,7 +24,6 @@ Author: Kevin Ahr
 
 // Maximum file name length (with extention)
 #define MAX_FILE_LEN 15
-#define MAX_PAGES 301
 
 #define EEPROM_MAX_WRITES 80
 #define EEPROM_BASE 350
@@ -34,6 +34,8 @@ Author: Kevin Ahr
 #define ENC_A 3
 #define ENC_B 2
 
+#define DBG_BAUD 115200
+
 // SDCARD_SS_PIN is defined for the built-in SD on some boards.
 #ifndef SDCARD_SS_PIN
 const uint8_t SD_CS_PIN = SS;
@@ -43,32 +45,32 @@ const uint8_t SD_CS_PIN = SDCARD_SS_PIN;
 #endif // SDCARD_SS_PIN
 
 // Try max SPI clock for an SD. Reduce SPI_CLOCK if errors occur.
-#define SPI_CLOCK SD_SCK_MHZ(50)
+#define SPI_CLOCK SD_SCK_MHZ(200)
 
 // Try to select the best SD card configuration.
 #if HAS_SDIO_CLASS
 #define SD_CONFIG SdioConfig(FIFO_SDIO)
 #elif ENABLE_DEDICATED_SPI
-#define SD_CONFIG SdSpiConfig(SD_CS_PIN, DEDICATED_SPI, SPI_CLOCK)
+#define SD_CONFIG SdSpiConfig(SD_CS_PIN, SPI_CLOCK)
 #else // HAS_SDIO_CLASS
 #define SD_CONFIG SdSpiConfig(SD_CS_PIN, SHARED_SPI, SPI_CLOCK)
 #endif // HAS_SDIO_CLASS
 
 #if SD_FAT_TYPE == 0
 SdFat sd;
-File dir;
+File root;
 File file;
 #elif SD_FAT_TYPE == 1
-SdFat32 sd;
-File32 dir;
+SdFat sd;
+File32 root;
 File32 file;
 #elif SD_FAT_TYPE == 2
 SdExFat sd;
-ExFile dir;
+ExFile root;
 ExFile file;
 #elif SD_FAT_TYPE == 3
 SdFs sd;
-FsFile dir;
+FsFile root;
 FsFile file;
 #else // SD_FAT_TYPE
 #error invalid SD_FAT_TYPE
@@ -81,7 +83,7 @@ Buzzer buzzer(BUZZER_PIN);
 OneButton btn(ENC_BTN);
 Encoder enc(ENC_A, ENC_B);
 
-char fileNames[MAX_PAGES][MAX_FILE_LEN];
+DMDFrame frame = DMDFrame(dmd.width, dmd.height);
 uint8_t fileBuffer[1025];
 unsigned int files = 0;
 
@@ -134,7 +136,8 @@ int euclidean_modulo(int a, int b);
 bool inRange(int val, int minimum, int maximum);
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(DBG_BAUD);
+  sd.initErrorPrint(&Serial);
 
   dmd.begin();
   dmd.setBrightness(brightness);
@@ -147,60 +150,70 @@ void setup() {
 
   loadSettings();
 
-  dispLoad(33);
+  // dispLoad(33);
 
   // Initialize the SD.
   if (!sd.begin(SD_CONFIG)) {
-    dispError(1);
-    while (true) {
-      buzzer.sound(NOTE_C2, 100);
-      buzzer.sound(0, 50);
-      buzzer.sound(NOTE_C2, 100);
-      buzzer.sound(0, 150);
-    }
+    // dispError(1);
+    // while (true) {
+    //   buzzer.sound(NOTE_C2, 100);
+    //   buzzer.sound(0, 50);
+    //   buzzer.sound(NOTE_C2, 100);
+    //   buzzer.sound(0, 150);
+    // }
+    // not sure why it returns false, yet success
   }
 
-  dispLoad(67);
+  // dispLoad(67);
 
   // Open root directory
-  if (!dir.open("/")) {
-    dispError(2);
-    while (true) {
-      buzzer.sound(NOTE_C2, 100);
-      buzzer.sound(0, 50);
-      buzzer.sound(NOTE_C2, 100);
-      buzzer.sound(0, 150);
-    }
+  if (!root.open("/")) {
+    // dispError(2);
+    Serial.println("Fail2");
+    // while (true) {
+    //   buzzer.sound(NOTE_C2, 100);
+    //   buzzer.sound(0, 50);
+    //   buzzer.sound(NOTE_C2, 100);
+    //   buzzer.sound(0, 150);
+    // }
   }
+  // if (root.getError()) {
+  //   dispError(3);
+  //   Serial.println("Fail3");
+  //   while (true) {
+  //     buzzer.sound(NOTE_C2, 100);
+  //     buzzer.sound(0, 50);
+  //     buzzer.sound(NOTE_C2, 100);
+  //     buzzer.sound(0, 150);
+  //   }
+  // }
 
-  // Loop through files and add names to fileNames
-  while (file.openNext(&dir, O_RDONLY)) {
-    if (!file.isDir()) {
-      file.getName(fileNames[files], MAX_FILE_LEN);
-    }
-    file.close();
-    files++;
-  }
-  if (dir.getError()) {
-    dispError(3);
-    while (true) {
-      buzzer.sound(NOTE_C2, 100);
-      buzzer.sound(0, 50);
-      buzzer.sound(NOTE_C2, 100);
-      buzzer.sound(0, 150);
-    }
-  }
+  // dispLoad(100);
 
-  dispLoad(100);
-
-  wipeAni();
+  // wipeAni();
 }
 
 void loop() {
-  for (currentPic = 1; currentPic < files;) {
+  int ta = millis();
+  // Attempt to open the next file
+  if (!file.openNext(&root, FILE_READ)) {
+      Serial.println("Reached the last file. Restarting...");
+      root.rewind();  // Reset directory reading position
+  }
+
+  // Print file name
+  char fileName[13];
+  file.getName(fileName, sizeof(fileName));
+  // Serial.print("Reading: ");
+  Serial.println(fileName);
+  // file.close();
+
+  Serial.print("Free RAM: ");
+  Serial.println(freeMemory());
+
     if (settingsLoaded == 0) {
-      if (EndsWith(fileNames[currentPic], ".DMD")) {
-        if (file.open(fileNames[currentPic], FILE_READ)) {
+      if (EndsWith(fileName, ".DMD")) {
+        if (true) {
           file.readBytes(fileBuffer, 1025);
           loadPic(fileBuffer);
           if (pageTime > 0) {
@@ -218,7 +231,6 @@ void loop() {
             buzzer.sound(0, 150);
           }
         }
-        file.close();
       } else {
         backgroundUpdate();
       }
@@ -228,7 +240,7 @@ void loop() {
     } else {
       backgroundUpdate();
     }
-  }
+    file.close();
 }
 
 void wipeAni() {
@@ -256,18 +268,17 @@ void loadSettings() {
 }
 
 void loadPic(const uint8_t *pic) {
-  int p = 1;
-  for (int y = 0; y < 32; y++) {
-    for (int x = 0; x < 32; x++) {
-      if (pic[p] == 1) {
-        dmd.setPixel(x, y, GRAPHICS_ON);
-      } else {
-        dmd.setPixel(x, y, GRAPHICS_OFF);
-      }
-      p++;
+  const uint8_t *p = pic + 1;  // Start from index 1
+
+  for (unsigned int y = 0; y < 32; y++) {
+    for (unsigned int x = 0; x < 32; x++) {
+      frame.setPixel(x, y, (*p++) ? GRAPHICS_ON : GRAPHICS_OFF);
     }
   }
+
+  dmd.copyFrame(frame, 0, 0);
 }
+
 
 void delayBar(unsigned int time) {
   for (int i = 0; i < 32; i++) {
@@ -320,9 +331,7 @@ void backgroundUpdate() {
 
   btn.tick();
 
-  if (paused) {
-    currentPic = euclidean_modulo(enc.read() / 4, files) + 1;
-  } else if (settingsLoaded) {
+  if (settingsLoaded) {
     if (settingsScroll) {
       if (settingsSelectedItem != euclidean_modulo(enc.read() / 4, 3)) {
         settingsSelectedItem = euclidean_modulo(enc.read() / 4, 3);
