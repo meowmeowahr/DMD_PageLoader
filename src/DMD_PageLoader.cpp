@@ -20,7 +20,7 @@ Author: Kevin Ahr
 
 // SD_FAT_TYPE = 0 for SdFat/File as defined in SdFatConfig.h,
 // 1 for FAT16/FAT32, 2 for exFAT, 3 for FAT16/FAT32 and exFAT.
-#define SD_FAT_TYPE 1
+#define SD_FAT_TYPE 3
 
 // Maximum file name length (with extention)
 #define MAX_FILE_LEN 15
@@ -62,8 +62,8 @@ File root;
 File file;
 #elif SD_FAT_TYPE == 1
 SdFat sd;
-File32 root;
-File32 file;
+FatFile root;
+FatFile file;
 #elif SD_FAT_TYPE == 2
 SdExFat sd;
 ExFile root;
@@ -79,12 +79,12 @@ FsFile file;
 #define VERSION "V100"
 
 SoftDMD dmd(1, 2); // DMD controls the entire display(s)
-Buzzer buzzer(BUZZER_PIN);
 OneButton btn(ENC_BTN);
 Encoder enc(ENC_A, ENC_B);
 
 DMDFrame frame = DMDFrame(dmd.width, dmd.height);
 uint8_t fileBuffer[1025];
+char fileName[MAX_FILE_LEN];
 unsigned int files = 0;
 
 unsigned long previousMillis = 0;
@@ -105,8 +105,6 @@ int settingsActiveItem = -1;
 bool settingsScroll = true;
 int settingsCurrentValue;
 
-unsigned int currentPic = 1;
-
 void wipeAni();
 
 void loadSettings();
@@ -117,7 +115,7 @@ void delayBar(unsigned int time);
 
 void dispError(uint8_t code);
 
-void dispLoad(uint8_t pcnt);
+void dispLoad(const String &pcnt);
 
 void backgroundUpdate();
 
@@ -143,14 +141,14 @@ void setup() {
   dmd.setBrightness(brightness);
   dmd.selectFont(Arial_Black_16);
 
-  buzzer.begin(10);
+  pinMode(BUZZER_PIN, OUTPUT);
 
   btn.attachClick(onClick);
   btn.attachLongPressStart(onLong);
 
   loadSettings();
 
-  // dispLoad(33);
+  dispLoad(F("33"));
 
   // Initialize the SD.
   if (!sd.begin(SD_CONFIG)) {
@@ -164,7 +162,7 @@ void setup() {
     // not sure why it returns false, yet success
   }
 
-  // dispLoad(67);
+  dispLoad(F("67"));
 
   // Open root directory
   if (!root.open("/")) {
@@ -188,7 +186,7 @@ void setup() {
   //   }
   // }
 
-  // dispLoad(100);
+  dispLoad(F("100"));
 
   // wipeAni();
 }
@@ -196,17 +194,15 @@ void setup() {
 void loop() {
   int ta = millis();
   // Attempt to open the next file
-  if (!file.openNext(&root, FILE_READ)) {
-      Serial.println("Reached the last file. Restarting...");
+  int rc = file.openNext(&root, FILE_READ);
+  if (!rc) {
+      Serial.print("Reached the last file. Restarting...");
+      Serial.println(rc);
       root.rewind();  // Reset directory reading position
   }
 
   // Print file name
-  char fileName[13];
   file.getName(fileName, sizeof(fileName));
-  // Serial.print("Reading: ");
-  Serial.println(fileName);
-  // file.close();
 
   Serial.print("Free RAM: ");
   Serial.println(freeMemory());
@@ -225,17 +221,10 @@ void loop() {
         } else {
           dispError(4);
           while (true) {
-            buzzer.sound(NOTE_C2, 100);
-            buzzer.sound(0, 50);
-            buzzer.sound(NOTE_C2, 100);
-            buzzer.sound(0, 150);
           }
         }
       } else {
         backgroundUpdate();
-      }
-      if (!paused) {
-        currentPic++;
       }
     } else {
       backgroundUpdate();
@@ -281,6 +270,7 @@ void loadPic(const uint8_t *pic) {
 
 
 void delayBar(unsigned int time) {
+  // tone(BUZZER_PIN, 440);
   for (int i = 0; i < 32; i++) {
     if (!paused and !settingsLoaded) {
       if (timebarPos == 1) {
@@ -303,6 +293,7 @@ void delayBar(unsigned int time) {
       }
     }
   }
+  // noTone(BUZZER_PIN);
 }
 
 void dispError(uint8_t code) {
@@ -316,15 +307,11 @@ void dispError(uint8_t code) {
   dmd.drawString(0, 17, codeBuf);
 }
 
-void dispLoad(uint8_t pcnt) {
+void dispLoad(const String &pcnt) {
   dmd.selectFont(Droid_Sans_12);
-
-  char pcntBuf[2];
-
   dmd.clearScreen();
   dmd.drawString(0, 1, "LOAD");
-  itoa(pcnt, pcntBuf, 10);
-  dmd.drawString(0, 17, strcat(pcntBuf, "%"));
+  dmd.drawString(0, 17, pcnt);
 }
 
 void backgroundUpdate() {
@@ -370,7 +357,7 @@ void backgroundUpdate() {
 }
 
 void onClick() {
-  buzzer.sound(NOTE_C3, 10);
+  tone(BUZZER_PIN, NOTE_B3, 10);
   if (!settingsLoaded) {
     paused = !paused;
   } else {
@@ -400,9 +387,7 @@ void onLong() {
   if (!paused) {
     settingsLoaded = !settingsLoaded;
     dmd.clearScreen();
-    buzzer.sound(NOTE_C3, 10);
-    buzzer.sound(0, 5);
-    buzzer.sound(NOTE_C3, 10);
+    tone(BUZZER_PIN, NOTE_C4, 10);
   }
 
   if (settingsLoaded) {
