@@ -12,6 +12,7 @@ Author: Kevin Ahr
 #include <Encoder.h>
 #include <OneButton.h>
 #include <MemoryFree.h>
+#include <ArduinoQueue.h>
 
 #include "Arial_Black_16.h"
 #include "Droid_Sans_12.h"
@@ -34,7 +35,11 @@ Author: Kevin Ahr
 #define ENC_A 3
 #define ENC_B 2
 
-#define DBG_BAUD 115200
+#define FX_BAUD 115200
+#define FX_RX_Q 10
+#define FX_MAX_CMD 32
+#define FX_LINE_ENDING '\n'
+#define FX_LINE_ENDING_STR "\n"
 
 // SDCARD_SS_PIN is defined for the built-in SD on some boards.
 #ifndef SDCARD_SS_PIN
@@ -81,6 +86,7 @@ FsFile file;
 SoftDMD dmd(1, 2); // DMD controls the entire display(s)
 OneButton btn(ENC_BTN);
 Encoder enc(ENC_A, ENC_B);
+ArduinoQueue<char*> fxQueue(FX_RX_Q);
 
 DMDFrame frame = DMDFrame(dmd.width, dmd.height);
 uint8_t fileBuffer[1025];
@@ -104,6 +110,8 @@ int settingsSelectedItem = 0;
 int settingsActiveItem = -1;
 bool settingsScroll = true;
 int settingsCurrentValue;
+
+char *fx = (char*)malloc(FX_MAX_CMD);
 
 void wipeAni();
 
@@ -134,7 +142,7 @@ int euclidean_modulo(int a, int b);
 bool inRange(int val, int minimum, int maximum);
 
 void setup() {
-  Serial.begin(DBG_BAUD);
+  Serial.begin(FX_BAUD);
   sd.initErrorPrint(&Serial);
 
   dmd.begin();
@@ -192,22 +200,55 @@ void setup() {
 }
 
 void loop() {
-  int ta = millis();
-  // Attempt to open the next file
-  int rc = file.openNext(&root, FILE_READ);
-  if (!rc) {
-      Serial.print("Reached the last file. Restarting...");
-      Serial.println(rc);
-      root.rewind();  // Reset directory reading position
+  if (Serial.available()) {
+    int bytesRead = Serial.readBytesUntil(FX_LINE_ENDING, fx, FX_MAX_CMD - 1);
+    fx[bytesRead] = '\0';
+    fxQueue.enqueue(fx);
+    return;
   }
 
-  // Print file name
-  file.getName(fileName, sizeof(fileName));
-
-  Serial.print("Free RAM: ");
+  Serial.print("memfree=");
   Serial.println(freeMemory());
 
+  Serial.print("uptime=");
+  Serial.println(millis());
+
+  Serial.print("maxq=");
+  Serial.println(fxQueue.maxQueueSize());
+
+  Serial.print("qitems=");
+  Serial.println(fxQueue.itemCount());
+
+  if (!fxQueue.isEmpty()) {
+    char *fxRaw = (char*)malloc(FX_MAX_CMD);
+    fxRaw = fxQueue.dequeue();
+    // parse command=value
+    char *fxCmd = strtok(fxRaw, "=");
+    char *fxVal = strtok(NULL, FX_LINE_ENDING_STR);
+    Serial.print("fxCmd=");
+    Serial.println(fxCmd);
+    Serial.print("fxVal=");
+    Serial.println(fxVal);
+
+  }
+  
     if (settingsLoaded == 0) {
+      // Attempt to open the next file
+      int rc = file.openNext(&root, FILE_READ);
+      if (!rc) {
+          Serial.println("state=rewind");
+          root.rewindDirectory();  // Reset directory reading position
+          return;
+      }
+    
+      // Print file name
+      file.getName(fileName, sizeof(fileName));
+
+      Serial.print("file=");
+      Serial.println(fileName);
+    
+      Serial.println("state=animate");
+      
       if (EndsWith(fileName, ".DMD")) {
         if (true) {
           file.readBytes(fileBuffer, 1025);
@@ -227,6 +268,7 @@ void loop() {
         backgroundUpdate();
       }
     } else {
+      Serial.println("state=settings");
       backgroundUpdate();
     }
     file.close();
