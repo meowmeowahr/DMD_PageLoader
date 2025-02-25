@@ -28,7 +28,7 @@ Author: Kevin Ahr
 
 #define BUZZER_PIN 22
 
-#define FX_BAUD 230400
+#define FX_BAUD 57600
 #define FX_RX_Q 25
 #define FX_MAX_CMD 32
 #define FX_LINE_ENDING '\n'
@@ -80,21 +80,20 @@ FsFile file;
 #define VERSION "v2.0.0"
 
 SoftDMD dmd(1, 2); // DMD controls the entire display(s)
+DMDFrame frame = DMDFrame(dmd.width, dmd.height);
+
 ArduinoQueue<char *> fxQueue(FX_RX_Q);
 
-DMDFrame frame = DMDFrame(dmd.width, dmd.height);
 uint8_t fileBuffer[1025];
 char fileName[MAX_FILE_LEN];
 unsigned int frames = 0;
 
 unsigned long previousMillis = 0;
+
 int timebarPos = 1;
 int pageTime = 0;
 int pageTimeMult = 1;
-
 int brightness = 127;
-
-char *fx = (char *)malloc(FX_MAX_CMD);
 
 void wipeAni();
 
@@ -117,18 +116,6 @@ int euclidean_modulo(int a, int b);
 bool inRange(int val, int minimum, int maximum);
 
 void displayBitmap();
-
-uint16_t reverseBits(uint16_t num);
-
-uint16_t reverseBits(uint16_t num) {
-  uint16_t rev = 0;
-  for (int i = 0; i < 16; i++) {
-    rev <<= 1;
-    rev |= (num & 1);
-    num >>= 1;
-  }
-  return rev;
-}
 
 void displayBitmap(const uint16_t image_frame[]) {
   for (int y = 0; y < 32; y++) {
@@ -198,13 +185,6 @@ void setup() {
 }
 
 void loop() {
-  if (Serial.available()) {
-    int bytesRead = Serial.readBytesUntil(FX_LINE_ENDING, fx, FX_MAX_CMD - 1);
-    fx[bytesRead] = '\0';
-    fxQueue.enqueue(fx);
-    return;
-  }
-
   if (Serial.availableForWrite()) {
     Serial.print("memfree=");
     Serial.println(freeMemory());
@@ -262,10 +242,10 @@ void loop() {
   // Print file name
   file.getName(fileName, sizeof(fileName));
 
-  Serial.print("file=");
-  Serial.println(fileName);
+  // Serial.print("file=");
+  // Serial.println(fileName);
 
-  Serial.println("state=animate");
+  // Serial.println("state=animate");
 
   if (EndsWith(fileName, ".DMD")) {
     if (true) {
@@ -278,6 +258,16 @@ void loop() {
     }
   }
   file.close();
+}
+
+void serialEvent() {
+  if (Serial.available()) {
+    char *fx = (char *)malloc(FX_MAX_CMD);
+    int bytesRead = Serial.readBytesUntil(FX_LINE_ENDING, fx, FX_MAX_CMD - 1);
+    fx[bytesRead] = '\0';
+    fxQueue.enqueue(fx);
+    return;
+  }
 }
 
 void saveSettingInt(const char *name, uint8_t value) {
