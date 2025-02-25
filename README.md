@@ -1,5 +1,5 @@
 <p align="center">
-  <img align="center" alt="Logo" src="docs/icon.png" width=256>
+  <img align="center" alt="Logo" src="docs/icon.png" width=200>
 </p>
 
 # DMD Page Loader
@@ -8,10 +8,9 @@ Show images on 2 32x16 HUB12 panels.
 
 ## Hardware Requirements
 
-* Arduino Mega 1560
+* Arduino Mega 2560
 * 2x 32x16 HUB12 Panels
 * SD Card Module
-* Rotary Encoder
 * SD Card
 * (optional) Buzzer
 
@@ -23,12 +22,11 @@ Show images on 2 32x16 HUB12 panels.
 
 ## Features
 
-* Auto looping images
-* Fixed image
+* Auto looping video frames
 * Variable display brightness
-* Settings menu
 * FAT32 file system support
-* EEPROM saving
+* SD card setting saving
+* (planned) DMDfx computer control
 
 ## DMD File Format
 
