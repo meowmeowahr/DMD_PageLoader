@@ -11,7 +11,6 @@ Author: Kevin Ahr
 #include <Buzzer.h>
 #include <EEPROMex.h>
 #include <MemoryFree.h>
-#include <ArduinoJson.h>
 
 #include "Arial_Black_16.h"
 #include "Droid_Sans_12.h"
@@ -27,19 +26,16 @@ Author: Kevin Ahr
 // Maximum file name length (with extention)
 #define MAX_FILE_LEN 15
 
-#define EEPROM_MAX_WRITES 80
-#define EEPROM_BASE 350
-
 #define BUZZER_PIN 22
 
-#define FX_BAUD 115200
-#define FX_RX_Q 10
+#define FX_BAUD 230400
+#define FX_RX_Q 25
 #define FX_MAX_CMD 32
 #define FX_LINE_ENDING '\n'
 #define FX_LINE_ENDING_STR "\n"
 
 // Try max SPI clock for an SD. Reduce SPI_CLOCK if errors occur.
-#define SPI_CLOCK SD_SCK_MHZ(200)
+#define SPI_CLOCK SD_SCK_MHZ(50)
 
 #if defined(HAS_TEENSY_SDIO)
 #define SD_CONFIG SdioConfig(FIFO_SDIO)
@@ -48,9 +44,9 @@ Author: Kevin Ahr
 #define SD_CONFIG SdioConfig(RP_CLK_GPIO, RP_CMD_GPIO, RP_DAT0_GPIO)
 #elif ENABLE_DEDICATED_SPI
 #define SD_CONFIG SdSpiConfig(SD_CS_PIN, DEDICATED_SPI, SPI_CLOCK)
-#else  // HAS_TEENSY_SDIO
+#else // HAS_TEENSY_SDIO
 #define SD_CONFIG SdSpiConfig(SD_CS_PIN, SHARED_SPI, SPI_CLOCK)
-#endif  // HAS_TEENSY_SDIO
+#endif // HAS_TEENSY_SDIO
 
 // SDCARD_SS_PIN is defined for the built-in SD on some boards.
 #ifndef SDCARD_SS_PIN
@@ -75,6 +71,7 @@ ExFile file;
 #elif SD_FAT_TYPE == 3
 SdFs sd;
 FsFile root;
+FsFile framesDir;
 FsFile file;
 #else // SD_FAT_TYPE
 #error invalid SD_FAT_TYPE
@@ -88,7 +85,7 @@ ArduinoQueue<char *> fxQueue(FX_RX_Q);
 DMDFrame frame = DMDFrame(dmd.width, dmd.height);
 uint8_t fileBuffer[1025];
 char fileName[MAX_FILE_LEN];
-unsigned int files = 0;
+unsigned int frames = 0;
 
 unsigned long previousMillis = 0;
 int timebarPos = 1;
@@ -99,8 +96,9 @@ int brightness = 127;
 
 char *fx = (char *)malloc(FX_MAX_CMD);
 
-
 void wipeAni();
+
+void saveSettingInt(const char *key, uint8_t value);
 
 void loadSettings();
 
@@ -125,9 +123,9 @@ uint16_t reverseBits(uint16_t num);
 uint16_t reverseBits(uint16_t num) {
   uint16_t rev = 0;
   for (int i = 0; i < 16; i++) {
-      rev <<= 1;
-      rev |= (num & 1);
-      num >>= 1;
+    rev <<= 1;
+    rev |= (num & 1);
+    num >>= 1;
   }
   return rev;
 }
@@ -135,12 +133,13 @@ uint16_t reverseBits(uint16_t num) {
 void displayBitmap(const uint16_t image_frame[]) {
   for (int y = 0; y < 32; y++) {
     for (int x = 0; x < 32; x++) {
-        int index = (y * 32 + x) / 16;  // Index in the uint16_t array
-        int bit_pos = x % 16;           // Bit position in the 16-bit word
+      int index = (y * 32 + x) / 16; // Index in the uint16_t array
+      int bit_pos = x % 16;          // Bit position in the 16-bit word
 
-        uint16_t value = pgm_read_word(&image_frame[index]);  // Read word from PROGMEM
-        bool pixel = (value >> (15 - bit_pos)) & 1;  // Extract correct bit
-        dmd.setPixel(x, y, pixel ? GRAPHICS_ON : GRAPHICS_OFF);
+      uint16_t value =
+          pgm_read_word(&image_frame[index]);     // Read word from PROGMEM
+      bool pixel = (value >> (15 - bit_pos)) & 1; // Extract correct bit
+      dmd.setPixel(x, y, pixel ? GRAPHICS_ON : GRAPHICS_OFF);
     }
   }
 }
@@ -154,8 +153,6 @@ void setup() {
 
   pinMode(BUZZER_PIN, OUTPUT);
 
-  loadSettings();
-
   // Initialize the SD.
   if (!sd.begin(SD_CONFIG)) {
     dispError(1);
@@ -163,25 +160,34 @@ void setup() {
     }
   }
 
+  loadSettings();
+
   // Open root directory
   if (!root.open("/")) {
     dispError(2);
     while (true) {
     }
   }
+  if (!sd.exists("/frames")) {
+    sd.mkdir("/frames");
+  }
+  if (!framesDir.open("/frames/")) {
+    dispError(3);
+    while (true) {
+    }
+  }
 
   // count the number of files ending in .DMD
-  char* filesChar = (char *)malloc(8);
+  char *filesChar = (char *)malloc(8);
   while (true) {
-    int rc = file.openNext(&root, O_READ);
+    int rc = file.openNext(&framesDir, O_READ);
     file.getName(fileName, sizeof(fileName));
     if (EndsWith(fileName, ".DMD")) {
-      files++;
-      itoa(files, filesChar, 10);
+      frames++;
+      itoa(frames, filesChar, 10);
       dispLoad(filesChar);
     }
     file.close();
-    Serial.println(rc);
     if (!rc) {
       break;
     }
@@ -199,17 +205,19 @@ void loop() {
     return;
   }
 
-  Serial.print("memfree=");
-  Serial.println(freeMemory());
+  if (Serial.availableForWrite()) {
+    Serial.print("memfree=");
+    Serial.println(freeMemory());
 
-  Serial.print("uptime=");
-  Serial.println(millis());
+    Serial.print("uptime=");
+    Serial.println(millis());
 
-  Serial.print("maxq=");
-  Serial.println(fxQueue.maxQueueSize());
+    Serial.print("maxq=");
+    Serial.println(fxQueue.maxQueueSize());
 
-  Serial.print("qitems=");
-  Serial.println(fxQueue.itemCount());
+    Serial.print("qitems=");
+    Serial.println(fxQueue.itemCount());
+  }
 
   if (!fxQueue.isEmpty()) {
     char *fxRaw = (char *)malloc(FX_MAX_CMD);
@@ -224,22 +232,31 @@ void loop() {
 
     // switch case for commands
     if (strcmp(fxCmd, "rewind") == 0) {
-      root.rewind();
+      framesDir.rewind();
     } else if (strcmp(fxCmd, "V") == 0) {
       Serial.print("version=");
       Serial.println(VERSION);
     } else if (strcmp(fxCmd, "formatsd") == 0) {
       sd.format(&Serial);
+    } else if (strcmp(fxCmd, "brightness") == 0) {
+      brightness = atoi(fxVal);
+      dmd.setBrightness(brightness);
+    } else if (strcmp(fxCmd, "timebarpos") == 0) {
+      timebarPos = atoi(fxVal);
+    } else if (strcmp(fxCmd, "pagetime") == 0) {
+      pageTime = atoi(fxVal);
+    } else if (strcmp(fxCmd, "save") == 0) {
+      saveSettingInt("brightness", brightness);
+      saveSettingInt("timebarPos", timebarPos);
+      saveSettingInt("pageTime", pageTime);
     }
-
   }
 
   // Attempt to open the next file
-  int rc = file.openNext(&root, FILE_READ);
+  int rc = file.openNext(&framesDir, FILE_READ);
   if (!rc) {
     Serial.println("state=rewind");
-    root.rewind(); // Reset directory reading position
-    return;
+    framesDir.rewind(); // Reset directory reading position
   }
 
   // Print file name
@@ -263,58 +280,51 @@ void loop() {
   file.close();
 }
 
-void wipeAni() {
-  for (int i = 0; i < 32; i++) {
-    dmd.drawLine(0, i, 31, i);
-    delay(10);
+void saveSettingInt(const char *name, uint8_t value) {
+  if (!sd.exists("/settings")) {
+    sd.mkdir("/settings");
   }
+
+  File settingFile = sd.open("/settings/" + String(name), O_WRONLY | O_TRUNC);
+  char *valueStr = (char *)malloc(4);
+  itoa(value, valueStr, 10);
+  settingFile.write(valueStr);
+  settingFile.close();
 }
 
 void loadSettings() {
-  // EEPROM.setMemPool(EEPROM_BASE, EEPROMSizeMega);
-  // EEPROM.setMaxAllowedWrites(EEPROM_MAX_WRITES);
-  // if (inRange(EEPROM.readInt(EEPROM_BASE), 0, 9990)) {
-  //   pageTime = EEPROM.readInt(EEPROM_BASE);
-  // }
+  if (!sd.exists("/settings")) {
+    sd.mkdir("/settings");
+  }
 
-  // if (inRange(EEPROM.readByte(EEPROM_BASE + 2), 0, 2)) {
-  //   timebarPos = EEPROM.readByte(EEPROM_BASE + 2);
-  // }
+  if (!sd.exists("/settings/brightness")) {
+    File brightnessFile = sd.open("/settings/brightness", FILE_WRITE);
+    brightnessFile.print(brightness);
+    brightnessFile.close();
+  }
+  if (!sd.exists("/settings/timebarPos")) {
+    File brightnessFile = sd.open("/settings/timebarPos", FILE_WRITE);
+    brightnessFile.print(timebarPos);
+    brightnessFile.close();
+  }
+  if (!sd.exists("/settings/pageTime")) {
+    File brightnessFile = sd.open("/settings/pageTime", FILE_WRITE);
+    brightnessFile.print(pageTime);
+    brightnessFile.close();
+  }
 
-  // if (inRange(EEPROM.readByte(EEPROM_BASE + 3), 1, 255)) {
-  //   brightness = EEPROM.readByte(EEPROM_BASE + 3);
-  //   dmd.setBrightness(brightness);
-  // }
-  // instead of using EEPROM, use SD card for settings with json
-  // if (file.open("settings.json", FILE_READ)) {
-  //   StaticJsonDocument<256> doc;
-  //   DeserializationError error = deserializeJson(doc, file);
-  //   if (error) {
-  //     Serial.print(F("deserializeJson() failed: "));
-  //     Serial.println(error.c_str());
-  //     return;
-  //   }
+  File brightnessFile = sd.open("/settings/brightness", FILE_READ);
+  brightness = brightnessFile.parseInt();
+  dmd.setBrightness(brightness);
+  brightnessFile.close();
 
-  //   pageTime = doc["pageTime"];
-  //   timebarPos = doc["timebarPos"];
-  //   brightness = doc["brightness"];
-  //   dmd.setBrightness(brightness);
+  File timebarPosFile = sd.open("/settings/timebarPos", FILE_READ);
+  timebarPos = timebarPosFile.parseInt();
+  timebarPosFile.close();
 
-  //   file.close();
-  //   Serial.println("here");
-  // } else {
-  //   // create settings file
-  //   if (file.open("settings.json", FILE_WRITE)) {
-  //     StaticJsonDocument<256> doc;
-  //     doc["pageTime"] = pageTime;
-  //     doc["timebarPos"] = timebarPos;
-  //     doc["brightness"] = brightness;
-
-  //     serializeJson(doc, file);
-  //     file.close();
-  //   }
-  //   Serial.println("here2");
-  // }
+  File pageTimeFile = sd.open("/settings/pageTime", FILE_READ);
+  pageTime = pageTimeFile.parseInt();
+  pageTimeFile.close();
 }
 
 void loadPic(const uint8_t *pic) {
