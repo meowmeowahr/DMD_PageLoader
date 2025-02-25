@@ -28,7 +28,7 @@ Author: Kevin Ahr
 
 #define BUZZER_PIN 22
 
-#define FX_BAUD 57600
+#define FX_BAUD 19200
 #define FX_RX_Q 25
 #define FX_MAX_CMD 32
 #define FX_LINE_ENDING '\n'
@@ -131,8 +131,58 @@ void displayBitmap(const uint16_t image_frame[]) {
   }
 }
 
+unsigned long barStartMillis = 0;
+int barCurrentPixel = 0;
+bool barActive = false;
+unsigned int barPixelDelay = 0;
+
+void startDelayBar(unsigned int time);
+
+bool updateDelayBar();
+
+void startDelayBar(unsigned int time) {
+  barPixelDelay = time;
+  barCurrentPixel = 0;
+  barActive = true;
+  barStartMillis = millis();
+  
+  if (timebarPos == 1) {
+    dmd.setPixel(barCurrentPixel, 31, GRAPHICS_XOR);
+  } else if (timebarPos == 2) {
+    dmd.setPixel(barCurrentPixel, 0, GRAPHICS_XOR);
+  }
+}
+
+bool updateDelayBar() {
+  if (!barActive) {
+    return false;
+  }
+  
+  unsigned long currentMillis = millis();
+  
+  if (currentMillis - barStartMillis >= barPixelDelay) {
+    barStartMillis = currentMillis;
+    barCurrentPixel++;
+    
+    if (barCurrentPixel < 32) {
+      if (timebarPos == 1) {
+        dmd.setPixel(barCurrentPixel, 31, GRAPHICS_XOR);
+      } else if (timebarPos == 2) {
+        dmd.setPixel(barCurrentPixel, 0, GRAPHICS_XOR);
+      }
+      return true;
+    } else {
+      barActive = false;
+      return false;
+    }
+  }
+  
+  return true;
+}
+
 void setup() {
   Serial.begin(FX_BAUD);
+  Serial.setTimeout(1000);
 
   dmd.begin();
   dmd.setBrightness(brightness);
@@ -185,24 +235,10 @@ void setup() {
 }
 
 void loop() {
-  if (Serial.availableForWrite()) {
-    Serial.print("memfree=");
-    Serial.println(freeMemory());
-
-    Serial.print("uptime=");
-    Serial.println(millis());
-
-    Serial.print("maxq=");
-    Serial.println(fxQueue.maxQueueSize());
-
-    Serial.print("qitems=");
-    Serial.println(fxQueue.itemCount());
-  }
-
   if (!fxQueue.isEmpty()) {
     char *fxRaw = (char *)malloc(FX_MAX_CMD);
     fxRaw = fxQueue.dequeue();
-    // parse command=value
+    
     char *fxCmd = strtok(fxRaw, "=");
     char *fxVal = strtok(NULL, FX_LINE_ENDING_STR);
     Serial.print("fxcmd=");
@@ -210,7 +246,7 @@ void loop() {
     Serial.print("fxval=");
     Serial.println(fxVal);
 
-    // switch case for commands
+    
     if (strcmp(fxCmd, "rewind") == 0) {
       framesDir.rewind();
     } else if (strcmp(fxCmd, "V") == 0) {
@@ -230,38 +266,54 @@ void loop() {
       saveSettingInt("timebarPos", timebarPos);
       saveSettingInt("pageTime", pageTime);
     }
+    
+    free(fxRaw);
   }
 
-  // Attempt to open the next file
+  if (barActive) {
+    updateDelayBar();
+    return;
+  }
+
   int rc = file.openNext(&framesDir, FILE_READ);
   if (!rc) {
     Serial.println("state=rewind");
     framesDir.rewind(); // Reset directory reading position
+    rc = file.openNext(&framesDir, FILE_READ);
+    if (!rc) {
+      return;
+    }
   }
 
-  // Print file name
   file.getName(fileName, sizeof(fileName));
 
-  // Serial.print("file=");
-  // Serial.println(fileName);
-
-  // Serial.println("state=animate");
-
   if (EndsWith(fileName, ".DMD")) {
-    if (true) {
-      file.read(fileBuffer, 1025);
-      loadPic(fileBuffer);
-      if (pageTime > 0) {
-        pageTimeMult = fileBuffer[0];
-        delayBar(pageTime / 32 * pageTimeMult);
-      }
+    file.read(fileBuffer, 1025);
+    loadPic(fileBuffer);
+    
+    if (pageTime > 0) {
+      pageTimeMult = fileBuffer[0];
+      startDelayBar(pageTime / 32 * pageTimeMult);
+    }
+    if (Serial.availableForWrite()) {
+      Serial.print("memfree=");
+      Serial.println(freeMemory());
+  
+      Serial.print("uptime=");
+      Serial.println(millis());
+  
+      Serial.print("maxq=");
+      Serial.println(fxQueue.maxQueueSize());
+  
+      Serial.print("qitems=");
+      Serial.println(fxQueue.itemCount());
     }
   }
   file.close();
 }
 
 void serialEvent() {
-  if (Serial.available()) {
+  while (Serial.available()) {
     char *fx = (char *)malloc(FX_MAX_CMD);
     int bytesRead = Serial.readBytesUntil(FX_LINE_ENDING, fx, FX_MAX_CMD - 1);
     fx[bytesRead] = '\0';
