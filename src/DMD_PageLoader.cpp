@@ -252,6 +252,8 @@ void loop() {
     } else if (strcmp(fxCmd, "V") == 0) {
       Serial.print("version=");
       Serial.println(VERSION);
+    } else if (strcmp(fxCmd, "X") == 0) {
+      Serial.println("modelno=DmdFxPanel");
     } else if (strcmp(fxCmd, "formatsd") == 0) {
       sd.format(&Serial);
     } else if (strcmp(fxCmd, "brightness") == 0) {
@@ -262,6 +264,7 @@ void loop() {
     } else if (strcmp(fxCmd, "pagetime") == 0) {
       pageTime = atoi(fxVal);
     } else if (strcmp(fxCmd, "save") == 0) {
+      displayBitmap(saving);
       saveSettingInt("brightness", brightness);
       saveSettingInt("timebarPos", timebarPos);
       saveSettingInt("pageTime", pageTime);
@@ -277,7 +280,6 @@ void loop() {
 
   int rc = file.openNext(&framesDir, FILE_READ);
   if (!rc) {
-    Serial.println("state=rewind");
     framesDir.rewind(); // Reset directory reading position
     rc = file.openNext(&framesDir, FILE_READ);
     if (!rc) {
