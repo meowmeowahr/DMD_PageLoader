@@ -270,6 +270,9 @@ void loop() {
       dmd.setBrightness(brightness);
     } else if (strcmp(fxCmd, "timebarpos") == 0) {
       timebarPos = atoi(fxVal);
+    } else if (strcmp(fxCmd, "qP") == 0) {
+      Serial.print("pagetime=");
+      Serial.println(pageTime); 
     } else if (strcmp(fxCmd, "pagetime") == 0) {
       pageTime = atoi(fxVal);
     } else if (strcmp(fxCmd, "save") == 0) {
