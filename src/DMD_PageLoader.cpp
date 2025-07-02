@@ -242,11 +242,6 @@ void loop() {
     
     char *fxCmd = strtok(fxRaw, "=");
     char *fxVal = strtok(NULL, FX_LINE_ENDING_STR);
-    Serial.print("fxcmd=");
-    Serial.println(fxCmd);
-    Serial.print("fxval=");
-    Serial.println(fxVal);
-
     
     if (strcmp(fxCmd, "rewind") == 0) {
       framesDir.rewind();
@@ -315,12 +310,6 @@ void loop() {
   
       Serial.print("uptime=");
       Serial.println(millis());
-  
-      Serial.print("maxq=");
-      Serial.println(fxQueue.maxQueueSize());
-  
-      Serial.print("qitems=");
-      Serial.println(fxQueue.itemCount());
     }
   }
   file.close();
