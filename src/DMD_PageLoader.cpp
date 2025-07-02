@@ -11,6 +11,7 @@ Author: Kevin Ahr
 #include <Buzzer.h>
 #include <EEPROMex.h>
 #include <MemoryFree.h>
+#include <Board_Identify.h>
 
 #include "Arial_Black_16.h"
 #include "Droid_Sans_12.h"
@@ -254,8 +255,16 @@ void loop() {
       Serial.println(VERSION);
     } else if (strcmp(fxCmd, "X") == 0) {
       Serial.println("modelno=DmdFxPanel");
+    } else if (strcmp(fxCmd, "I") == 0) {
+      Serial.print("board_id=");
+      Serial.print(BoardIdentify::mcu);
+      Serial.print("@");
+      Serial.println(BoardIdentify::model);
     } else if (strcmp(fxCmd, "formatsd") == 0) {
       sd.format(&Serial);
+    } else if (strcmp(fxCmd, "qB") == 0) {
+      Serial.print("brightness=");
+      Serial.println(brightness); 
     } else if (strcmp(fxCmd, "brightness") == 0) {
       brightness = atoi(fxVal);
       dmd.setBrightness(brightness);
